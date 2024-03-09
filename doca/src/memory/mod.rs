@@ -35,8 +35,8 @@ pub mod buffer;
 pub mod registered_memory;
 
 use core::ffi::c_void;
-use ffi::{doca_error, doca_mmap_populate};
-use page_size;
+use ffi::{doca_error, doca_mmap_set_memrange};
+// use page_size;
 use std::ptr::NonNull;
 use std::sync::Arc;
 
@@ -68,6 +68,15 @@ impl Drop for DOCAMmap {
     fn drop(&mut self) {
         // Check whether the device should be removed
         if self.ok {
+
+            let ret = unsafe { ffi::doca_mmap_stop(self.inner_ptr()) };
+            if ret != doca_error::DOCA_SUCCESS {
+                panic!(
+                    "Failed to stop the mmap: {:?}",
+                    ret
+                );
+            }
+
             for dev in &self.ctx {
                 let ret = unsafe { ffi::doca_mmap_dev_rm(self.inner_ptr(), dev.inner_ptr()) };
 
@@ -113,14 +122,14 @@ impl DOCAMmap {
             return Err(ret);
         }
 
-        let mut res = Self {
+        let res = Self {
             inner: unsafe { NonNull::new_unchecked(pool) },
             ctx: Vec::new(),
             ok: true,
         };
-        res.set_max_chunks(DOCA_MMAP_CHUNK_SIZE)?;
+        // res.set_max_chunks(DOCA_MMAP_CHUNK_SIZE)?;
 
-        res.start()?;
+        // res.start()?;
         Ok(res)
     }
 
@@ -197,10 +206,10 @@ impl DOCAMmap {
             .ok_or(doca_error::DOCA_ERROR_INVALID_VALUE)?;
 
         let ret = unsafe {
-            ffi::doca_mmap_export(
+            ffi::doca_mmap_export_dpu(
                 self.inner_ptr(),
                 dev.inner_ptr(),
-                &mut export_desc as *mut _,
+                &mut export_desc as *const _ as *mut _,
                 len_ptr,
             )
         };
@@ -248,16 +257,38 @@ impl DOCAMmap {
     ///
     /// The memory can be used for DMA for all the contexts already in the mmap.
     ///
+    #[allow(unused)]
     pub fn populate(&self, mr: RawPointer) -> DOCAResult<()> {
-        let null_opaque: *mut c_void = std::ptr::null_mut::<c_void>();
+        // let null_opaque: *mut c_void = std::ptr::null_mut::<c_void>();
+        // let ret = unsafe {
+        //     doca_mmap_populate(
+        //         self.inner_ptr(),
+        //         mr.inner.as_ptr(),
+        //         mr.payload,
+        //         page_size::get(),
+        //         None,
+        //         null_opaque,
+        //     )
+        // };
+
+        // if ret != doca_error::DOCA_SUCCESS {
+        //     return Err(ret);
+        // }
+
+        Ok(())
+    }
+        
+    /// Add memory range to DOCA memory map.
+    /// It is similar to `reg_mr` in RDMA.
+    ///
+    /// The memory can be used for DMA for all the contexts already in the mmap.
+    ///
+    pub fn set_memrange(&self, mr: RawPointer) -> DOCAResult<()> {
         let ret = unsafe {
-            doca_mmap_populate(
-                self.inner_ptr(),
-                mr.inner.as_ptr(),
-                mr.payload,
-                page_size::get(),
-                None,
-                null_opaque,
+            doca_mmap_set_memrange(
+                self.inner_ptr(), 
+                mr.inner.as_ptr(), 
+                mr.payload
             )
         };
 
@@ -273,7 +304,7 @@ impl DOCAMmap {
     /// start the DOCA mmap
     /// Allows execution of different operations on the mmap.
     ///
-    fn start(&self) -> DOCAResult<()> {
+    pub fn start(&self) -> DOCAResult<()> {
         let ret = unsafe { ffi::doca_mmap_start(self.inner_ptr()) };
 
         if ret != doca_error::DOCA_SUCCESS {
@@ -283,18 +314,18 @@ impl DOCAMmap {
         Ok(())
     }
 
-    /// Set a new max number of chunks to populate in a DOCA Memory Map.
-    /// Note: once a memory map object has been first started this functionality will not be available.
-    ///
-    fn set_max_chunks(&mut self, num: u32) -> DOCAResult<()> {
-        let ret = unsafe { ffi::doca_mmap_set_max_num_chunks(self.inner_ptr(), num) };
+    // Set a new max number of chunks to populate in a DOCA Memory Map.
+    // Note: once a memory map object has been first started this functionality will not be available.
+    //
+    // fn set_max_chunks(&mut self, num: u32) -> DOCAResult<()> {
+    //     let ret = unsafe { ffi::doca_mmap_set_max_num_chunks(self.inner_ptr(), num) };
 
-        if ret != doca_error::DOCA_SUCCESS {
-            return Err(ret);
-        }
+    //     if ret != doca_error::DOCA_SUCCESS {
+    //         return Err(ret);
+    //     }
 
-        Ok(())
-    }
+    //     Ok(())
+    // }
 }
 
 mod tests {

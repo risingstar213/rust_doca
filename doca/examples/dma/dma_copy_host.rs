@@ -57,7 +57,7 @@ fn main() {
     };
 
     // populate the buffer into the mmap
-    local_mmap_ref.populate(src_raw).unwrap();
+    local_mmap_ref.set_memrange(src_raw).unwrap();
 
     // and export it into memory so later we can store it into a file
     let export = local_mmap_ref.export(dev_idx).unwrap();

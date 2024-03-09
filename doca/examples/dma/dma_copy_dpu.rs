@@ -77,6 +77,8 @@ fn main() {
             .to_buffer(&inv)
             .unwrap();
 
+    doca_mmap.start().unwrap();
+
     /* Start to submit the DMA job!  */
     let job = workq.create_dma_job(dma_src_buf, dma_dst_buf);
     workq.submit(&job).expect("failed to submit the job");

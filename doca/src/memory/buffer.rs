@@ -39,7 +39,7 @@ use core::ffi::c_void;
 use ffi::doca_error;
 use std::ptr::NonNull;
 use std::sync::Arc;
-use std::convert::From;
+// use std::convert::From;
 
 use crate::memory::DOCAMmap;
 use crate::DOCAResult;

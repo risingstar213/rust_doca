@@ -129,28 +129,33 @@ impl Device {
     ///
     ///  - `DOCA_ERROR_INVALID_VALUE`: received invalid input.
     ///
+    /// 
     pub fn name(&self) -> DOCAResult<String> {
-        let mut pci_bdf: ffi::doca_pci_bdf = Default::default();
+        let mut pci_str = vec![0_u8; 16];
         let ret =
-            unsafe { ffi::doca_devinfo_get_pci_addr(self.inner_ptr(), &mut pci_bdf as *mut _) };
-
+            unsafe { ffi::doca_devinfo_get_pci_addr_str(self.inner_ptr(), pci_str.as_mut_ptr().cast()) };
+        
         if ret != doca_error::DOCA_SUCCESS {
+            println!("get name str error!!!");
             return Err(ret);
         }
 
-        // first check the `bus` part
-        let bus = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.bus() };
-        let device = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.device() };
-        let func = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.function() };
+        println!("get vec {:?}", pci_str);
 
-        Ok(format!(
-            "{:x}{:x}:{:x}{:x}.{:x}",
-            bus / 16,
-            bus % 16,
-            device / 16,
-            device % 16,
-            func
-        ))
+        Ok(String::from(std::str::from_utf8(&pci_str[5..12]).unwrap()))
+        // first check the `bus` part
+        // let bus = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.bus() };
+        // let device = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.device() };
+        // let func = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.function() };
+
+        // Ok(format!(
+        //     "{:x}{:x}:{:x}{:x}.{:x}",
+        //     bus / 16,
+        //     bus % 16,
+        //     device / 16,
+        //     device % 16,
+        //     func
+        // ))
     }
 
     /// Open a DOCA device and store it as a context for further use.
@@ -227,9 +232,11 @@ impl DevContext {
 pub fn open_device_with_pci(pci: &str) -> DOCAResult<Arc<DevContext>> {
     let dev_list = devices()?;
 
+    println!("cmp pci {:?}", pci.as_bytes().to_vec());
     for i in 0..dev_list.num_devices() {
         let device = dev_list.get(i).unwrap();
         let pci_addr = device.name()?;
+        println!("get name {:?}, len = {}", pci_addr.as_bytes(), pci.len());
         if pci_addr.eq(pci) {
             // open the device
             return device.open();

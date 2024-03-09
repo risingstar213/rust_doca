@@ -53,26 +53,36 @@ fn main() {
 
     let mut workq = DOCAWorkQueue::new(1, &ctx).unwrap();
 
-    let mut doca_mmap = Arc::new(DOCAMmap::new().unwrap());
+    let mut src_mmap = Arc::new(DOCAMmap::new().unwrap());
+    let mut dst_mmap = Arc::new(DOCAMmap::new().unwrap());
     unsafe {
-        Arc::get_mut_unchecked(&mut doca_mmap)
+        Arc::get_mut_unchecked(&mut src_mmap)
+            .add_device(&device)
+            .unwrap()
+    };
+
+    unsafe {
+        Arc::get_mut_unchecked(&mut dst_mmap)
             .add_device(&device)
             .unwrap()
     };
 
     let inv = BufferInventory::new(1024).unwrap();
     let mut dma_src_buf =
-        DOCARegisteredMemory::new(&doca_mmap, unsafe { RawPointer::from_box(&src_buffer) })
+        DOCARegisteredMemory::new(&src_mmap, unsafe { RawPointer::from_box(&src_buffer) })
             .unwrap()
             .to_buffer(&inv)
             .unwrap();
     unsafe { dma_src_buf.set_data(0, length).unwrap() };
 
     let dma_dst_buf =
-        DOCARegisteredMemory::new(&doca_mmap, unsafe { RawPointer::from_box(&dst_buffer) })
+        DOCARegisteredMemory::new(&dst_mmap, unsafe { RawPointer::from_box(&dst_buffer) })
             .unwrap()
             .to_buffer(&inv)
             .unwrap();
+
+    src_mmap.start().unwrap();
+    dst_mmap.start().unwrap();
 
     /* Start to submit the DMA job!  */
     let job = workq.create_dma_job(dma_src_buf, dma_dst_buf);

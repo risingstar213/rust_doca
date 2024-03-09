@@ -26,7 +26,7 @@ impl DOCARegisteredMemory {
     /// Create a new DOCARegisteredMemory
     pub fn new(mmap: &Arc<DOCAMmap>, register_memory: RawPointer) -> DOCAResult<Self> {
         let mmap = mmap.clone();
-        mmap.populate(register_memory)?;
+        mmap.set_memrange(register_memory)?;
 
         Ok(Self {
             mmap,
