@@ -35,6 +35,7 @@ fn main() {
         // DOCA_MMAP part
         .whitelist_function("doca_mmap_.*")
         .whitelist_type("doca_mmap")
+        .whitelist_type("doca_access_flags")
         // DOCA_BUF_INVENTORY part
         .whitelist_type("doca_buf_inventory")
         .whitelist_function("doca_buf_inventory_.*")

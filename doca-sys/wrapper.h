@@ -1,3 +1,4 @@
+#include <doca_types.h>
 #include <doca_dev.h>
 #include <doca_mmap.h>
 #include <doca_ctx.h>

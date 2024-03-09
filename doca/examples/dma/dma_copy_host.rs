@@ -59,6 +59,10 @@ fn main() {
     // populate the buffer into the mmap
     local_mmap_ref.set_memrange(src_raw).unwrap();
 
+    local_mmap_ref.set_permission(ffi::DOCA_ACCESS_DPU_READ_ONLY).unwrap();
+
+    local_mmap_ref.start().unwrap();
+
     // and export it into memory so later we can store it into a file
     let export = local_mmap_ref.export(dev_idx).unwrap();
     doca::save_config(export, src_raw, export_file, buffer_file).unwrap();
