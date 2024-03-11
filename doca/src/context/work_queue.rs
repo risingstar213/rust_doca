@@ -47,7 +47,7 @@ impl DOCAEvent {
     pub fn result(&self) -> DOCAError {
         unsafe {
             // FIXME: what if DOCAError is not u32?
-            let res: DOCAError = std::mem::transmute(self.inner.result.u64 as u32);
+            let res: DOCAError = std::mem::transmute(self.inner.result.u64_ as u32);
             res
         }
     }
