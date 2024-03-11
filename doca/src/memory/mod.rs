@@ -35,7 +35,7 @@ pub mod buffer;
 pub mod registered_memory;
 
 use core::ffi::c_void;
-use ffi::{doca_error, doca_mmap_set_memrange, doca_mmap_set_permissions};
+use ffi::{doca_access_flags, doca_error, doca_mmap_set_memrange, doca_mmap_set_permissions};
 // use page_size;
 use std::ptr::NonNull;
 use std::sync::Arc;
@@ -301,11 +301,11 @@ impl DOCAMmap {
 
     /// Set permmisions
     ///
-    pub fn set_permission(&mut self, mask: u32) -> DOCAResult<()> {
+    pub fn set_permission(&mut self, mask: doca_access_flags) -> DOCAResult<()> {
         let ret = unsafe {
             doca_mmap_set_permissions(
                 self.inner_ptr(), 
-                mask
+                mask as u32
             )
         };
 
