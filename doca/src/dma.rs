@@ -186,7 +186,8 @@ mod tests {
         let workq = DOCAWorkQueue::new(1, &ctx).unwrap();
 
         // create buffers
-        let doca_mmap = Arc::new(DOCAMmap::new().unwrap());
+        let src_mmap = Arc::new(DOCAMmap::new().unwrap());
+        let dst_mmap = Arc::new(DOCAMmap::new().unwrap());
         let inv = BufferInventory::new(1024).unwrap();
 
         let test_len = 64;
@@ -203,10 +204,10 @@ mod tests {
             payload: test_len,
         };
 
-        let registered_memory = DOCARegisteredMemory::new(&doca_mmap, raw_pointer).unwrap();
+        let registered_memory = DOCARegisteredMemory::new(&src_mmap, raw_pointer).unwrap();
         let src_buf = registered_memory.to_buffer(&inv).unwrap();
 
-        let registered_memory = DOCARegisteredMemory::new(&doca_mmap, raw_pointer_1).unwrap();
+        let registered_memory = DOCARegisteredMemory::new(&dst_mmap, raw_pointer_1).unwrap();
         let dst_buf = registered_memory.to_buffer(&inv).unwrap();
 
         let _ = workq.create_dma_job(src_buf, dst_buf);

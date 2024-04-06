@@ -64,7 +64,7 @@ fn main() {
     local_mmap_ref.start().unwrap();
 
     // and export it into memory so later we can store it into a file
-    let export = local_mmap_ref.export(dev_idx).unwrap();
+    let export = local_mmap_ref.export_dpu(dev_idx).unwrap();
     doca::save_config(export, src_raw, export_file, buffer_file).unwrap();
     println!(
         "Please copy {} and {} to the DPU and run DMA Copy DPU sample before closing",

@@ -29,7 +29,7 @@
 //! };
 //!
 //! // And register the buffer into the memory map object.
-//! mmap.populate(mr).unwrap();
+//! mmap.set_memrange(mr).unwrap();
 //! ```
 pub mod buffer;
 pub mod registered_memory;
@@ -127,9 +127,7 @@ impl DOCAMmap {
             ctx: Vec::new(),
             ok: true,
         };
-        // res.set_max_chunks(DOCA_MMAP_CHUNK_SIZE)?;
 
-        // res.start()?;
         Ok(res)
     }
 
@@ -195,7 +193,7 @@ impl DOCAMmap {
     /// Input:
     /// - dev_index: the index of the local device that the mmap is registered on.
     ///
-    pub fn export(&mut self, dev_index: usize) -> DOCAResult<RawPointer> {
+    pub fn export_dpu(&mut self, dev_index: usize) -> DOCAResult<RawPointer> {
         let len: usize = 0;
         let len_ptr = &len as *const usize as *mut usize;
 
@@ -248,32 +246,6 @@ impl DOCAMmap {
         if ret != doca_error::DOCA_SUCCESS {
             return Err(ret);
         }
-
-        Ok(())
-    }
-
-    /// Add memory range to DOCA memory map.
-    /// It is similar to `reg_mr` in RDMA.
-    ///
-    /// The memory can be used for DMA for all the contexts already in the mmap.
-    ///
-    #[allow(unused)]
-    pub fn populate(&self, mr: RawPointer) -> DOCAResult<()> {
-        // let null_opaque: *mut c_void = std::ptr::null_mut::<c_void>();
-        // let ret = unsafe {
-        //     doca_mmap_populate(
-        //         self.inner_ptr(),
-        //         mr.inner.as_ptr(),
-        //         mr.payload,
-        //         page_size::get(),
-        //         None,
-        //         null_opaque,
-        //     )
-        // };
-
-        // if ret != doca_error::DOCA_SUCCESS {
-        //     return Err(ret);
-        // }
 
         Ok(())
     }
@@ -333,18 +305,6 @@ impl DOCAMmap {
         Ok(())
     }
 
-    // Set a new max number of chunks to populate in a DOCA Memory Map.
-    // Note: once a memory map object has been first started this functionality will not be available.
-    //
-    // fn set_max_chunks(&mut self, num: u32) -> DOCAResult<()> {
-    //     let ret = unsafe { ffi::doca_mmap_set_max_num_chunks(self.inner_ptr(), num) };
-
-    //     if ret != doca_error::DOCA_SUCCESS {
-    //         return Err(ret);
-    //     }
-
-    //     Ok(())
-    // }
 }
 
 mod tests {
@@ -368,7 +328,10 @@ mod tests {
             payload: test_len,
         };
 
-        doca_mmap.populate(mr).unwrap();
+        // populate the buffer into the mmap
+        doca_mmap.set_memrange(mr).unwrap();
+
+        doca_mmap.start().unwrap();
     }
 
     // Test show that the `rm_device` is forbidden on a exported mmap
@@ -390,9 +353,13 @@ mod tests {
             payload: test_len,
         };
 
-        doca_mmap.populate(mr).unwrap();
+        // populate the buffer into the mmap
+        doca_mmap.set_memrange(mr).unwrap();
+        doca_mmap.set_permission(ffi::doca_access_flags::DOCA_ACCESS_DPU_READ_ONLY).unwrap();
 
-        let _ = doca_mmap.export(dev_idx).unwrap();
+        doca_mmap.start().unwrap();
+
+        let _ = doca_mmap.export_dpu(dev_idx).unwrap();
 
         assert!(!doca_mmap.rm_device(dev_idx).is_ok());
     }
