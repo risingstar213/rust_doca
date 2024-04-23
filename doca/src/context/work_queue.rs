@@ -14,7 +14,7 @@
 
 use std::{ptr::NonNull, sync::Arc};
 
-use ffi::{doca_event, doca_job};
+use ffi::{doca_error, doca_event, doca_job};
 
 use crate::{DOCAError, DOCAResult};
 
@@ -49,6 +49,13 @@ impl DOCAEvent {
             // FIXME: what if DOCAError is not u32?
             let res: DOCAError = std::mem::transmute(self.inner.result.u64_ as u32);
             res
+        }
+    }
+
+    /// Get the user mark
+    pub fn user_mark(&self) -> u64 {
+        unsafe {
+            self.inner.user_data.u64_
         }
     }
 }
@@ -133,6 +140,20 @@ impl<T: EngineToContext> DOCAWorkQueue<T> {
             return Err(ret);
         }
         Ok(event)
+    }
+
+    /// Return the full event
+    #[inline]
+    pub fn progress_retrieve(&mut self) -> (DOCAEvent, doca_error) {
+        let mut event = DOCAEvent::new();
+        let ret = unsafe {
+            ffi::doca_workq_progress_retrieve(
+                self.inner_ptr(),
+                &mut event.inner as *mut _,
+                ffi::DOCA_WORKQ_RETRIEVE_FLAGS_NONE as i32,
+            )
+        };
+        (event, ret)
     }
 
     /// Get the inner pointer of the DOCA WorkQ.
