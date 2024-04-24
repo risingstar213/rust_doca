@@ -148,11 +148,6 @@ impl Device {
         DevContext::with_device(self.clone())
     }
 
-    /// Open a DOCA Rep device and store it as a context for further use.
-    pub fn open_rep(self: &Arc<Self>) -> DOCAResult<Arc<DevRepContext>> {
-        DevRepContext::with_device(self.clone())
-    }
-
     /// Get the maximum supported buffer size for DMA job.
     pub fn get_max_buf_size(&self) -> DOCAResult<u64> {
         let mut num: u64 = 0;
@@ -233,6 +228,109 @@ pub fn open_device_with_pci(pci: &str) -> DOCAResult<Arc<DevContext>> {
     Err(doca_error::DOCA_ERROR_INVALID_VALUE)
 }
 
+/// DOCA Device list
+pub struct DeviceRepList(&'static mut [*mut ffi::doca_devinfo_rep]);
+
+unsafe impl Sync for DeviceRepList {}
+unsafe impl Send for DeviceRepList {}
+
+impl Drop for DeviceRepList {
+    fn drop(&mut self) {
+        unsafe { ffi::doca_devinfo_rep_list_destroy(self.0.as_mut_ptr()) };
+
+        // Show drop order only in `debug` mode
+        #[cfg(debug_assertions)]
+        println!("DeviceList is dropped!");
+    }
+}
+
+impl DeviceRepList {
+    /// Returns the number of devices.
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Returns `true` if there are any devices.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Returns the number of devices.
+    pub fn num_devices(&self) -> usize {
+        self.len()
+    }
+
+    /// Returns the device at the given `index`, or `None` if out of bounds.
+    pub fn get(self: &Arc<Self>, index: usize) -> Option<Arc<DeviceRep>> {
+        self.0
+            .get(index)
+            .map(|d| {
+                let inner_ptr = NonNull::new(*d);
+
+                let inner = match inner_ptr {
+                    Some(inner) => inner,
+                    None => return None,
+                };
+
+                Some(Arc::new(DeviceRep {
+                    inner: inner,
+                    parent_devlist: self.clone(),
+                }))
+            })
+            .flatten()
+    }
+}
+
+/// An DOCA device
+pub struct DeviceRep {
+    inner: NonNull<ffi::doca_devinfo_rep>,
+
+    // a device hold to ensure the device list is not freed
+    // before the Device is freed
+    #[allow(dead_code)]
+    parent_devlist: Arc<DeviceRepList>,
+}
+
+unsafe impl Sync for DeviceRep {}
+unsafe impl Send for DeviceRep {}
+
+impl DeviceRep {
+    /// Return the PCIe address of the doca device, e.g "17:00.1".
+    /// The matching between the str & `doca_pci_bdf` can be seen
+    /// as below.
+    /// ---------------------------------------
+    /// -- 4 -- b -- : -- 0 -- 0 -- . -- 1 ----
+    /// --   BUS     |    DEVICE    | FUNCTION
+    ///
+    /// # Errors
+    ///
+    ///  - `DOCA_ERROR_INVALID_VALUE`: received invalid input.
+    ///
+    /// 
+    pub fn name(&self) -> DOCAResult<String> {
+        let mut pci_str = vec![0_u8; 16];
+        let ret =
+            unsafe { ffi::doca_devinfo_rep_get_pci_addr_str(self.inner_ptr(), pci_str.as_mut_ptr().cast()) };
+        
+        if ret != doca_error::DOCA_SUCCESS {
+            println!("get name str error!!!");
+            return Err(ret);
+        }
+
+        Ok(String::from(std::str::from_utf8(&pci_str[5..12]).unwrap()))
+    }
+
+    /// Open a DOCA device and store it as a context for further use.
+    pub fn open(self: &Arc<Self>) -> DOCAResult<Arc<DevRepContext>> {
+        DevRepContext::with_device(self.clone())
+    }
+
+    /// Return the device
+    pub unsafe fn inner_ptr(&self) -> *mut ffi::doca_devinfo_rep {
+        self.inner.as_ptr()
+    }
+}
+
 /// An opened Doca Device
 pub struct DevRepContext {
     ctx: NonNull<ffi::doca_dev_rep>,
@@ -250,9 +348,9 @@ impl Drop for DevRepContext {
 
 impl DevRepContext {
     /// Opens a context for the given device, so we can use it later.
-    pub fn with_device(dev: Arc<Device>) -> DOCAResult<Arc<DevRepContext>> {
+    pub fn with_device(dev: Arc<DeviceRep>) -> DOCAResult<Arc<DevRepContext>> {
         let mut ctx: *mut ffi::doca_dev_rep = std::ptr::null_mut();
-        let ret = unsafe { ffi::doca_dev_rep_open(dev.inner_ptr() as _, &mut ctx as *mut _) };
+        let ret = unsafe { ffi::doca_dev_rep_open(dev.inner_ptr(), &mut ctx as *mut _) };
 
         if ret != doca_error::DOCA_SUCCESS {
             return Err(ret);
@@ -281,16 +379,17 @@ pub fn open_device_rep_with_pci(local_dev: &Arc<DevContext>, rep_pci_addr: &str)
         panic!("Failed to create devinfo representations list. Representor devices are available only on DPU, do not run on Host");
     }
 
-    let devices = unsafe { std::slice::from_raw_parts_mut(dev_list as *mut *mut ffi::doca_devinfo, num_devs as usize) };
+    let devices = unsafe { std::slice::from_raw_parts_mut(dev_list, num_devs as usize) };
 
-    let dev_list = Arc::new(DeviceList(devices));
+    let dev_list = Arc::new(DeviceRepList(devices));
 
     for i in 0..dev_list.num_devices() {
         let device = dev_list.get(i).unwrap();
         let pci_addr = device.name().unwrap();
+
         if pci_addr.eq(rep_pci_addr) {
             // open the device
-            return device.open_rep();
+            return device.open();
         }
     }
 

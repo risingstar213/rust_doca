@@ -73,7 +73,7 @@ impl CommChannel {
         }
 
         let mut temp_buf= [0u8; 10];
-        let mut len: usize = 0;
+        let mut len: usize = 2;
 
         loop {
             let res = unsafe { ffi::doca_comm_channel_ep_recvfrom(ep, &mut temp_buf as *mut _ as _, &mut len, 0, &mut peer_addr) };
@@ -81,7 +81,7 @@ impl CommChannel {
                 break;
             }
             if res != DOCAError::DOCA_ERROR_AGAIN {
-                panic!("unexpected");
+                panic!("unexpected {:?} ", res);
             }
 
             sleep(Duration::from_millis(1));
