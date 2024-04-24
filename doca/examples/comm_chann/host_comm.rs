@@ -1,5 +1,7 @@
-use doca::comm_chan::CommChannel;
+use std::{ptr::NonNull, sync::Arc};
 
+use doca::comm_chan::CommChannel;
+use doca::*;
 fn main() {
     let device = doca::device::open_device_with_pci("03:00.0").unwrap();
     let device_rep = doca::device::open_device_rep_with_pci(&device, "af:00.0").unwrap();

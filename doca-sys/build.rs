@@ -8,6 +8,7 @@ fn main() {
         arch
     );
     println!("cargo:rustc-link-lib=doca_dma");
+    println!("cargo:rustc-link-lib=doca_comm_channel");
     println!("cargo:rustc-link-lib=doca_common");
 
     // Tell cargo to invalidate the built crate whenever the wrapper changes
