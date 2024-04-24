@@ -7,7 +7,7 @@ fn main() {
     let conn = CommChannel::create_client("cc_conn\0", &device);
 
     let send_txt = "hello dpu";
-    let mut send_buffer = vec![0u8; 100].into_boxed_slice();
+    let mut send_buffer = vec![0u8; 9].into_boxed_slice();
     let mut recv_buffer = vec![0u8; 100].into_boxed_slice();
     send_buffer.copy_from_slice(send_txt.as_bytes());
 
@@ -18,7 +18,7 @@ fn main() {
 
     let mut recv_raw = RawPointer {
         inner: NonNull::new(recv_buffer.as_mut_ptr() as *mut _).unwrap(),
-        payload: 0,
+        payload: 100,
     };
 
     conn.block_recv_req(&mut recv_raw);

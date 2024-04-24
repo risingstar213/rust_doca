@@ -194,7 +194,8 @@ impl CommChannel {
 
     /// recv req
     pub fn recv_req(&self, raw: &mut RawPointer) -> doca_error {
-        let res = unsafe { ffi::doca_comm_channel_ep_recvfrom(self.inner_ptr(), raw.inner.as_ptr(), &mut raw.payload, 0, std::ptr::null_mut()) };
+        let mut peer_addr: *mut ffi::doca_comm_channel_addr_t = std::ptr::null_mut();
+        let res = unsafe { ffi::doca_comm_channel_ep_recvfrom(self.inner_ptr(), raw.inner.as_ptr(), &mut raw.payload, 0, &mut peer_addr) };
         res
     }
 
