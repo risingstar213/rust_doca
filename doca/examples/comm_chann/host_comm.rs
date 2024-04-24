@@ -3,10 +3,8 @@ use std::{ptr::NonNull, sync::Arc};
 use doca::comm_chan::CommChannel;
 use doca::*;
 fn main() {
-    let device = doca::device::open_device_with_pci("03:00.0").unwrap();
-    let device_rep = doca::device::open_device_rep_with_pci(&device, "af:00.0").unwrap();
-
-    let conn = CommChannel::create_server("cc_conn\0", &device, &device_rep);
+    let device = doca::device::open_device_with_pci("af:00.0").unwrap();
+    let conn = CommChannel::create_client("cc_conn\0", &device);
 
     let send_txt = "hello dpu";
     let mut send_buffer = vec![0u8; 100].into_boxed_slice();
