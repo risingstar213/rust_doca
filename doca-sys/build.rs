@@ -53,6 +53,9 @@ fn main() {
         .allowlist_type("doca_dma_.*")
         .allowlist_function("doca_dma_.*")
         .allowlist_type("doca_pci_bdf")
+        // DOCA_COMM_CHAN part
+        .allowlist_type("doca_comm_channel_.*")
+        .allowlist_function("doca_comm_channel_.*")
         .derive_default(true)
         .derive_debug(true)
         .prepend_enum_name(false)

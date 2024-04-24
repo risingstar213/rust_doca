@@ -27,7 +27,7 @@
 use ffi::doca_error;
 use std::{ptr::NonNull, sync::Arc};
 
-use crate::DOCAResult;
+use crate::{DOCAError, DOCAResult};
 
 /// DOCA Device list
 pub struct DeviceList(&'static mut [*mut ffi::doca_devinfo]);
@@ -141,24 +141,16 @@ impl Device {
         }
 
         Ok(String::from(std::str::from_utf8(&pci_str[5..12]).unwrap()))
-        // first check the `bus` part
-        // let bus = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.bus() };
-        // let device = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.device() };
-        // let func = unsafe { pci_bdf.__bindgen_anon_1.__bindgen_anon_1.function() };
-
-        // Ok(format!(
-        //     "{:x}{:x}:{:x}{:x}.{:x}",
-        //     bus / 16,
-        //     bus % 16,
-        //     device / 16,
-        //     device % 16,
-        //     func
-        // ))
     }
 
     /// Open a DOCA device and store it as a context for further use.
     pub fn open(self: &Arc<Self>) -> DOCAResult<Arc<DevContext>> {
         DevContext::with_device(self.clone())
+    }
+
+    /// Open a DOCA Rep device and store it as a context for further use.
+    pub fn open_rep(self: &Arc<Self>) -> DOCAResult<Arc<DevRepContext>> {
+        DevRepContext::with_device(self.clone())
     }
 
     /// Get the maximum supported buffer size for DMA job.
@@ -182,8 +174,6 @@ impl Device {
 /// An opened Doca Device
 pub struct DevContext {
     ctx: NonNull<ffi::doca_dev>,
-    #[allow(dead_code)]
-    parent: Arc<Device>,
 }
 
 impl Drop for DevContext {
@@ -208,7 +198,6 @@ impl DevContext {
 
         Ok(Arc::new(DevContext {
             ctx: NonNull::new(ctx).ok_or(doca_error::DOCA_ERROR_INVALID_VALUE)?,
-            parent: dev,
         }))
     }
 
@@ -238,6 +227,70 @@ pub fn open_device_with_pci(pci: &str) -> DOCAResult<Arc<DevContext>> {
         if pci_addr.eq(pci) {
             // open the device
             return device.open();
+        }
+    }
+
+    Err(doca_error::DOCA_ERROR_INVALID_VALUE)
+}
+
+/// An opened Doca Device
+pub struct DevRepContext {
+    ctx: NonNull<ffi::doca_dev_rep>,
+}
+
+impl Drop for DevRepContext {
+    fn drop(&mut self) {
+        unsafe { ffi::doca_dev_rep_close(self.ctx.as_ptr()) };
+
+        // Show drop order only in `debug` mode
+        #[cfg(debug_assertions)]
+        println!("Device Context is dropped!");
+    }
+}
+
+impl DevRepContext {
+    /// Opens a context for the given device, so we can use it later.
+    pub fn with_device(dev: Arc<Device>) -> DOCAResult<Arc<DevRepContext>> {
+        let mut ctx: *mut ffi::doca_dev_rep = std::ptr::null_mut();
+        let ret = unsafe { ffi::doca_dev_rep_open(dev.inner_ptr() as _, &mut ctx as *mut _) };
+
+        if ret != doca_error::DOCA_SUCCESS {
+            return Err(ret);
+        }
+
+        Ok(Arc::new(DevRepContext {
+            ctx: NonNull::new(ctx).ok_or(doca_error::DOCA_ERROR_INVALID_VALUE)?,
+        }))
+    }
+
+    /// Return the DOCA Device context raw pointer
+    #[inline]
+    pub unsafe fn inner_ptr(&self) -> *mut ffi::doca_dev_rep {
+        self.ctx.as_ptr()
+    }
+}
+
+/// simplied realizarion for create rep with no wrapper...
+/// I have no time temporarily
+pub fn open_device_rep_with_pci(local_dev: &Arc<DevContext>, rep_pci_addr: &str) -> DOCAResult<Arc<DevRepContext>> {
+    let mut num_devs: u32 = 0;
+    let mut dev_list: *mut *mut ffi::doca_devinfo_rep = std::ptr::null_mut();
+
+    let ret = unsafe { ffi::doca_devinfo_rep_list_create(local_dev.inner_ptr(), 2 /* DOCA_DEV_REP_FILTER_NET */, &mut dev_list, &mut num_devs) };
+    if ret != DOCAError::DOCA_SUCCESS {
+        panic!("Failed to create devinfo representations list. Representor devices are available only on DPU, do not run on Host");
+    }
+
+    let devices = unsafe { std::slice::from_raw_parts_mut(dev_list as *mut *mut ffi::doca_devinfo, num_devs as usize) };
+
+    let dev_list = Arc::new(DeviceList(devices));
+
+    for i in 0..dev_list.num_devices() {
+        let device = dev_list.get(i).unwrap();
+        let pci_addr = device.name().unwrap();
+        if pci_addr.eq(rep_pci_addr) {
+            // open the device
+            return device.open_rep();
         }
     }
 
